@@ -26,6 +26,11 @@
       --danger:  #e05c65;
       --star:    #ffffff;
       --shadow:  0 18px 55px rgba(0,0,0,.45);
+
+      /* Curvas de easing suaves reutilizables */
+      --ease-silk:  cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-soft:  cubic-bezier(0.65, 0, 0.35, 1);
+      --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     *{box-sizing:border-box}
@@ -55,7 +60,7 @@
     }
 
     /* ============================================================
-       CANVAS (optimizadas para GPU)
+       CANVAS (optimizadas + transiciones más suaves)
     ============================================================ */
     #supernova-canvas,
     #swarmCanvas,
@@ -73,8 +78,12 @@
       width: 100vw;
       height: 100vh;
       z-index: 1;
-      transition: opacity 0.48s ease-in-out;
-      will-change: opacity;
+      opacity: 1;
+      /* Fundido largo y sedoso: 0.9s con curva silk */
+      transition: opacity 0.9s var(--ease-silk),
+                  filter   1.1s var(--ease-silk),
+                  transform 1.1s var(--ease-silk);
+      will-change: opacity, filter, transform;
     }
 
     #swarmCanvas {
@@ -85,8 +94,18 @@
       z-index: 2;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.64s ease-in-out;
-      will-change: opacity;
+      /* Entrada aún más larga y difuminada al inicio */
+      transition: opacity 1.1s var(--ease-silk),
+                  filter   1.2s var(--ease-silk),
+                  transform 1.2s var(--ease-silk);
+      filter: blur(8px);
+      transform: scale(1.04);
+      will-change: opacity, filter, transform;
+    }
+    #swarmCanvas.visible {
+      opacity: 1;
+      filter: blur(0);
+      transform: scale(1);
     }
 
     /* ============================================================
@@ -120,14 +139,15 @@
       user-select: none;
       touch-action: manipulation;
 
-      transition: transform .25s cubic-bezier(0.25, 0.8, 0.25, 1),
-                  background .3s,
-                  border-color .3s,
-                  box-shadow .3s,
-                  opacity 0.48s ease-in-out;
+      transition: transform .35s var(--ease-silk),
+                  background .35s var(--ease-silk),
+                  border-color .35s var(--ease-silk),
+                  box-shadow .35s var(--ease-silk),
+                  opacity .9s var(--ease-silk),
+                  filter  .9s var(--ease-silk);
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7),
                   inset 0 0 15px rgba(82, 214, 138, 0.08);
-      will-change: transform, opacity;
+      will-change: transform, opacity, filter;
     }
 
     .btn-ecosort span.ai-text {
@@ -138,7 +158,7 @@
     .btn-ecosort .arrow-icon {
       color: var(--accent);
       font-size: 1.1em;
-      transition: transform 0.3s ease;
+      transition: transform 0.35s var(--ease-silk);
       line-height: 1;
       text-shadow: 0 0 10px rgba(82, 214, 138, 0.9);
     }
@@ -161,16 +181,19 @@
     }
 
     .btn-ecosort.pulse {
-      animation: btnPulse .55s ease-out;
+      animation: btnPulse .75s var(--ease-silk);
     }
     @keyframes btnPulse {
       0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(82,214,138,.65); }
-      60%  { transform: scale(1.12); box-shadow: 0 0 0 28px rgba(82,214,138,0); }
+      55%  { transform: scale(1.14); box-shadow: 0 0 0 32px rgba(82,214,138,0); }
       100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(82,214,138,0);   }
     }
 
     /* ============================================================
-       OVERLAY DE TRANSICIÓN
+       OVERLAY DE TRANSICIÓN  ·  mucho más sedoso
+       - Aparición con curva silk
+       - Desvanecimiento largo con curva out
+       - Escala y filtro para efecto "respirar"
     ============================================================ */
     #transition-overlay {
       position: fixed;
@@ -184,10 +207,12 @@
                   rgba(30,67,56,0.92)    70%,
                   rgba(5,12,10,0.98)     100%);
       opacity: 0;
-      transform: scale(0.4);
-      transition: opacity 0.44s ease-in-out,
-                  transform 0.56s cubic-bezier(0.16, 1, 0.3, 1);
-      will-change: opacity, transform;
+      transform: scale(0.6);
+      filter: blur(0px);
+      transition: opacity 0.9s var(--ease-silk),
+                  transform 1.2s var(--ease-soft),
+                  filter 0.9s var(--ease-silk);
+      will-change: opacity, transform, filter;
     }
 
     #transition-overlay.app-enter {
@@ -199,9 +224,21 @@
                   #050c0a 100%);
     }
 
+    /* Fase 1: entra suave */
     #transition-overlay.flash {
       opacity: 1;
-      transform: scale(1.6);
+      transform: scale(1.5);
+      filter: blur(0px);
+    }
+
+    /* Fase 2: se disuelve con desenfoque y expansión */
+    #transition-overlay.dissolve {
+      opacity: 0;
+      transform: scale(2.2);
+      filter: blur(22px);
+      transition: opacity 1.3s var(--ease-out),
+                  transform 1.5s var(--ease-out),
+                  filter   1.3s var(--ease-out);
     }
 
     /* ============================================================
@@ -221,12 +258,18 @@
       opacity: 0;
       pointer-events: none;
       display: none;
-      transition: opacity 0.96s ease-in-out;
-      will-change: opacity;
+      transform: scale(1.02);
+      filter: blur(6px);
+      transition: opacity 1.3s var(--ease-silk),
+                  transform 1.4s var(--ease-silk),
+                  filter 1.3s var(--ease-silk);
+      will-change: opacity, transform, filter;
     }
     #app-screen.visible {
       opacity: 1;
       pointer-events: auto;
+      transform: scale(1);
+      filter: blur(0);
     }
 
     #stars-canvas{
@@ -246,7 +289,7 @@
       pointer-events: none;
       z-index: -1;
       transform: translate(-50%, -50%);
-      transition: transform 0.08s ease-out;
+      transition: transform 0.12s ease-out;
       will-change: transform;
     }
 
@@ -284,7 +327,7 @@
     #app-screen input:focus{border-color:var(--accent)}
 
     .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-    .btn{border:0;border-radius:10px;padding:11px 16px;font-weight:600;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s ease;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+    .btn{border:0;border-radius:10px;padding:11px 16px;font-weight:600;font-size:13px;font-family:inherit;cursor:pointer;transition:all .2s var(--ease-silk);touch-action:manipulation;-webkit-user-select:none;user-select:none}
     .primary{background:var(--accent);color:#030f0b}.primary:hover:not(:disabled){background:#62e399}
     .secondary{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--line)}.secondary:hover:not(:disabled){background:rgba(255,255,255,0.09)}
     .danger{background:rgba(224,92,101,0.1);color:var(--danger);border:1px solid rgba(224,92,101,0.2)}.danger:hover:not(:disabled){background:rgba(224,92,101,0.18)}
@@ -311,7 +354,7 @@
     .bars{display:grid;gap:10px;margin-top:16px}
     .barRow{display:grid;grid-template-columns:110px 1fr 48px;align-items:center;gap:10px;font-size:12px;font-weight:500}
     .track{height:6px;background:#050c0a;border-radius:99px;overflow:hidden;border:1px solid var(--line)}
-    .fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .18s ease;will-change:width}
+    .fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .25s var(--ease-silk);will-change:width}
     .pct{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
 
     .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
@@ -327,9 +370,6 @@
       #app-screen header{align-items:flex-start}.badge{display:none}
     }
 
-    /* ============================================================
-       REDUCCIÓN DE COSTO EN MÓVIL / TÁCTIL
-    ============================================================ */
     @media (hover: none), (max-width: 900px) {
       .btn-ecosort,
       .card,
@@ -340,7 +380,7 @@
       }
       .btn-ecosort { box-shadow: 0 6px 20px rgba(0,0,0,.55), inset 0 0 10px rgba(82,214,138,.06); }
       .card { box-shadow: 0 12px 30px rgba(0,0,0,.4); }
-      .btn-ecosort:hover { transform: none; } /* sin hover en táctil */
+      .btn-ecosort:hover { transform: none; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -475,7 +515,6 @@
     clickAudio.volume = 1.0;
     transicionAudio.volume = 1.0;
 
-    // Desbloqueo de audio en la primera interacción (política de autoplay)
     function unlockAudio(){
       [clickAudio, transicionAudio].forEach(a => {
         try {
@@ -504,7 +543,6 @@
       } catch(e){}
     }
 
-    // Delegación de eventos: un único listener para todos los botones
     document.addEventListener('click', (e) => {
       const target = e.target.closest('button');
       if (target) playClick();
@@ -523,18 +561,17 @@
     const swCtx = swarmCanvasEl.getContext('2d', { alpha: true, desynchronized: true });
 
     /* ============================================================
-       VISIBILIDAD: pausar cuando la pestaña no está visible
+       VISIBILIDAD
     ============================================================ */
     let tabVisible = !document.hidden;
     document.addEventListener('visibilitychange', () => {
       tabVisible = !document.hidden;
       lastSnTime = 0;
       lastSwTime = 0;
-      lastStarsTime = 0;
     }, { passive: true });
 
     /* ============================================================
-       1. SUPERNOVA  ·  25% más rápida + adaptativa
+       1. SUPERNOVA
     ============================================================ */
     const SN_VELOCIDAD = 1.875;
     const SN_PARTICLES = CONFIG.snParticles;
@@ -591,8 +628,6 @@
 
     const SN_FRAME_INTERVAL = 1000 / Math.min(CONFIG.fps, 60);
     let lastSnTime = 0;
-    let snGradient = null;
-    let snGradientRadius = -1;
 
     function renderSupernova(now) {
       requestAnimationFrame(renderSupernova);
@@ -608,18 +643,8 @@
         supernova.alpha  -= 0.008 * SN_VELOCIDAD;
 
         const r = Math.max(1, supernova.radius);
-
-        // Reusar el gradiente si el radio no cambió significativamente
-        if (!snGradient || Math.abs(r - snGradientRadius) > 6) {
-          snGradient = snCtx.createRadialGradient(
-            supernova.x, supernova.y, 0,
-            supernova.x, supernova.y, r
-          );
-          snGradientRadius = r;
-        }
-
         const a = Math.max(0, supernova.alpha);
-        // Recrear paradas cada frame (el gradiente cacheado no se puede editar)
+
         const g = snCtx.createRadialGradient(supernova.x, supernova.y, 0, supernova.x, supernova.y, r);
         g.addColorStop(0,    `rgba(255,255,255,${a})`);
         g.addColorStop(0.15, `rgba(82,214,138,${a * 0.95})`);
@@ -654,7 +679,7 @@
     }
 
     /* ============================================================
-       2. TYPOGRAPHY SWARM  ·  con glyphs pre-renderizados
+       2. TYPOGRAPHY SWARM
     ============================================================ */
     const SW_COLORES = [
       '#52d68a', '#52d68a', '#52d68a',
@@ -677,7 +702,6 @@
     const SW_RETORNO  = SW_AJUSTES.retorno * SW_AJUSTES.fluidez;
     const SW_COUNT    = CONFIG.swarmCount;
 
-    /* ---------- Pre-render de glifos (mucho más rápido que fillText) ---------- */
     const GLYPH_CACHE = {};
     (function buildGlyphs(){
       const base = CONFIG.glyphBase;
@@ -710,7 +734,6 @@
 
     const mouse = { x: undefined, y: undefined, active: false };
 
-    // Eventos de puntero unificados y pasivos
     window.addEventListener('pointermove', (e) => {
       mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
     }, { passive: true });
@@ -723,7 +746,6 @@
       mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
     }, { passive: true });
 
-    // Fallback táctil si pointer events no están disponibles
     if (!window.PointerEvent) {
       window.addEventListener('touchmove', (e) => {
         const t = e.touches[0];
@@ -735,10 +757,8 @@
     }
 
     class Particle {
-      constructor() {
-        this.reset(true);
-      }
-      reset(initial) {
+      constructor() { this.reset(); }
+      reset() {
         this.x = Math.random() * swW;
         this.y = Math.random() * swH;
         this.baseX = this.x;
@@ -748,7 +768,6 @@
         this.size  = Math.random() * 15 + 5;
         this.density = Math.random() * 30 + 1;
         this.glyph = GLYPH_CACHE[this.char + '|' + this.color];
-        if (initial) { /* nada extra */ }
       }
       draw() {
         const s = this.size;
@@ -770,7 +789,6 @@
             return;
           }
         }
-        // Regreso suave
         const rx = this.x - this.baseX;
         const ry = this.y - this.baseY;
         if (rx !== 0 || ry !== 0) {
@@ -799,12 +817,8 @@
       swCtx.clearRect(0, 0, swW, swH);
 
       const n = particles.length;
-      for (let i = 0; i < n; i++) {
-        particles[i].update();
-      }
-      for (let i = 0; i < n; i++) {
-        particles[i].draw();
-      }
+      for (let i = 0; i < n; i++) particles[i].update();
+      for (let i = 0; i < n; i++) particles[i].draw();
     }
 
     function resizeSwarm() {
@@ -818,36 +832,56 @@
     }
 
     /* ============================================================
-       3. TRANSICIÓN SUPERNOVA → SWARM
+       3. TRANSICIÓN SUPERNOVA → SWARM  ·  MUY SUAVE
+       - Flash entra con curva silk (0.9s)
+       - Swap de canvas a mitad del flash
+       - Swarm entra con blur→focus y scale→1 (1.1s)
+       - Overlay sale con dissolve (blur + scale + fade, 1.3s)
+       - Botón aparece con fundido largo
     ============================================================ */
     function runTransition() {
       playTransition();
 
+      // 1) El flash entra suavemente
       transitionOverlay.classList.add('flash');
 
+      // 2) A mitad del flash hacemos el swap visual
+      //    (la supernova se desvanece lentamente, el swarm aparece con blur→focus)
       setTimeout(() => {
-        supernovaCanvasEl.style.opacity = '0';
-        swarmCanvasEl.style.opacity     = '1';
-      }, 400);
+        supernovaCanvasEl.style.opacity  = '0';
+        supernovaCanvasEl.style.filter   = 'blur(6px)';
+        supernovaCanvasEl.style.transform = 'scale(1.04)';
 
+        swarmCanvasEl.classList.add('visible'); // dispara opacity 1 + blur 0 + scale 1
+      }, 450);
+
+      // 3) El flash comienza a disolverse (blur + scale + fade)
       setTimeout(() => {
         transitionOverlay.classList.remove('flash');
-      }, 680);
+        transitionOverlay.classList.add('dissolve');
+      }, 800);
 
+      // 4) Limpiamos la clase dissolve para poder reusar el overlay luego
+      setTimeout(() => {
+        transitionOverlay.classList.remove('dissolve');
+      }, 2100);
+
+      // 5) El botón aparece con fundido largo
       setTimeout(() => {
         mainBtn.style.opacity = '1';
         mainBtn.style.pointerEvents = 'auto';
-      }, 1000);
+      }, 1400);
 
+      // 6) Eliminamos la supernova del layout
       setTimeout(() => {
         supernovaCanvasEl.style.display = 'none';
-      }, 960);
+      }, 1500);
     }
 
     supernova.onEnd = runTransition;
 
     /* ============================================================
-       4. TRANSICIÓN SWARM → APP
+       4. TRANSICIÓN SWARM → APP  ·  MUY SUAVE
     ============================================================ */
     let appEntered = false;
 
@@ -860,33 +894,42 @@
       mainBtn.classList.add('pulse');
       mainBtn.style.pointerEvents = 'none';
 
+      // 1) Overlay con paleta de la app + flash
       transitionOverlay.classList.add('app-enter');
-
       requestAnimationFrame(() => {
         transitionOverlay.classList.add('flash');
       });
 
+      // 2) Swarm y botón se desvanecen lentamente
       setTimeout(() => {
-        swarmCanvasEl.style.opacity = '0';
-        mainBtn.style.opacity       = '0';
-      }, 280);
+        swarmCanvasEl.style.opacity   = '0';
+        swarmCanvasEl.style.filter    = 'blur(8px)';
+        swarmCanvasEl.style.transform = 'scale(0.96)';
+        mainBtn.style.opacity         = '0';
+        mainBtn.style.filter          = 'blur(4px)';
+      }, 400);
 
+      // 3) La app aparece con scale + blur→focus
       setTimeout(() => {
         appScreen.style.display = 'block';
         void appScreen.offsetHeight;
         requestAnimationFrame(() => {
           appScreen.classList.add('visible');
         });
-      }, 520);
+      }, 750);
 
+      // 4) Overlay se disuelve suavemente
       setTimeout(() => {
         transitionOverlay.classList.remove('flash');
-      }, 800);
+        transitionOverlay.classList.add('dissolve');
+      }, 1100);
 
+      // 5) Limpieza
       setTimeout(() => {
+        transitionOverlay.classList.remove('dissolve');
         transitionOverlay.classList.remove('app-enter');
         swarmCanvasEl.style.display = 'none';
-      }, 1360);
+      }, 2400);
     });
 
     /* ============================================================
@@ -1019,7 +1062,7 @@
       try {
         webcam.update();
         await predict();
-      } catch(e){ /* ignorar frames perdidos */ }
+      } catch(e){}
       rafId = requestAnimationFrame(loop);
     }
 
@@ -1088,7 +1131,7 @@
     }, { passive: true });
 
     /* ============================================================
-       ESTRELLAS  ·  velocidad +80% + adaptativas + rAF throttled
+       ESTRELLAS
     ============================================================ */
     const starsCanvas = $("stars-canvas");
     const starsCtx = starsCanvas.getContext("2d", { alpha: true, desynchronized: true });
