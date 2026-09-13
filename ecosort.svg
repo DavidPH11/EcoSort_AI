@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Fondo circular oscuro -->
+  <circle cx="50" cy="50" r="48" fill="#0B2417" stroke="#42DC8A" stroke-width="4"/>
+  
+  <!-- Hoja / Reciclaje en Menta Neón -->
+  <path d="M35 65 C25 45 40 25 60 25 C65 35 60 45 50 50 C40 55 35 60 35 65 Z" fill="none" stroke="#42DC8A" stroke-width="5" stroke-linecap="round"/>
+  
+  <!-- Órbita / Conexión IA en Celeste -->
+  <path d="M45 75 C65 75 75 55 65 38" fill="none" stroke="#3A9AD9" stroke-width="4" stroke-dasharray="4 4"/>
+  
+  <!-- Nodos de Inteligencia Artificial -->
+  <circle cx="60" cy="25" r="5" fill="#42DC8A"/>
+  <circle cx="65" cy="38" r="4" fill="#3A9AD9"/>
+  <circle cx="35" cy="65" r="4" fill="#FFFFFF"/>
+</svg>
