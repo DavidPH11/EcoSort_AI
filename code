@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050c0a">
+  <title>EcoSort_AI · Experiencia Completa</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+  <style>
+    :root {
+      --bg:      #050c0a;
+      --panel:   #0b1915;
+      --panel2:  #102620;
+      --line:    #1e4338;
+      --text:    #f0f7f4;
+      --muted:   #8faea4;
+      --accent:  #52d68a;
+      --accent2: #3bb8eb;
+      --danger:  #e05c65;
+      --star:    #ffffff;
+      --shadow:  0 18px 55px rgba(0,0,0,.45);
+    }
+
+    *{box-sizing:border-box}
+
+    html, body {
+      height: 100%;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: radial-gradient(circle at center,
+                  var(--panel2) 0%,
+                  #071a14 55%,
+                  var(--bg) 100%);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      letter-spacing: -0.01em;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      height: 100vh;
+      height: 100dvh;
+      overscroll-behavior: none;
+    }
+
+    /* ============================================================
+       CANVAS (optimizadas para GPU)
+    ============================================================ */
+    #supernova-canvas,
+    #swarmCanvas,
+    #stars-canvas {
+      display: block;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      transform: translateZ(0);
+      contain: strict;
+    }
+
+    #supernova-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      transition: opacity 0.48s ease-in-out;
+      will-change: opacity;
+    }
+
+    #swarmCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 2;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.64s ease-in-out;
+      will-change: opacity;
+    }
+
+    /* ============================================================
+       BOTÓN
+    ============================================================ */
+    .btn-ecosort {
+      position: relative;
+      z-index: 10;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+
+      background: rgba(5, 12, 10, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: clamp(1.4rem, 3.5vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--text);
+
+      padding: 18px 48px;
+      border-radius: 9999px;
+      border: 1.5px solid rgba(82, 214, 138, 0.35);
+      cursor: pointer;
+      outline: none;
+      text-decoration: none;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: manipulation;
+
+      transition: transform .25s cubic-bezier(0.25, 0.8, 0.25, 1),
+                  background .3s,
+                  border-color .3s,
+                  box-shadow .3s,
+                  opacity 0.48s ease-in-out;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7),
+                  inset 0 0 15px rgba(82, 214, 138, 0.08);
+      will-change: transform, opacity;
+    }
+
+    .btn-ecosort span.ai-text {
+      color: var(--accent);
+      text-shadow: 0 0 12px rgba(82, 214, 138, 0.9);
+    }
+
+    .btn-ecosort .arrow-icon {
+      color: var(--accent);
+      font-size: 1.1em;
+      transition: transform 0.3s ease;
+      line-height: 1;
+      text-shadow: 0 0 10px rgba(82, 214, 138, 0.9);
+    }
+
+    .btn-ecosort:hover {
+      transform: translateY(-5px) scale(1.04);
+      background: rgba(16, 38, 32, 0.9);
+      border-color: var(--accent);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8),
+                  0 0 30px rgba(82, 214, 138, 0.6),
+                  inset 0 0 15px rgba(82, 214, 138, 0.25);
+    }
+
+    .btn-ecosort:hover .arrow-icon { transform: translateX(8px); }
+
+    .btn-ecosort:active {
+      transform: translateY(-2px) scale(0.98);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5),
+                  0 0 15px rgba(82, 214, 138, 0.4);
+    }
+
+    .btn-ecosort.pulse {
+      animation: btnPulse .55s ease-out;
+    }
+    @keyframes btnPulse {
+      0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(82,214,138,.65); }
+      60%  { transform: scale(1.12); box-shadow: 0 0 0 28px rgba(82,214,138,0); }
+      100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(82,214,138,0);   }
+    }
+
+    /* ============================================================
+       OVERLAY DE TRANSICIÓN
+    ============================================================ */
+    #transition-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      pointer-events: none;
+      background: radial-gradient(circle at center,
+                  #ffffff 0%,
+                  rgba(82,214,138,0.95)  18%,
+                  rgba(59,184,235,0.85)  42%,
+                  rgba(30,67,56,0.92)    70%,
+                  rgba(5,12,10,0.98)     100%);
+      opacity: 0;
+      transform: scale(0.4);
+      transition: opacity 0.44s ease-in-out,
+                  transform 0.56s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: opacity, transform;
+    }
+
+    #transition-overlay.app-enter {
+      background: radial-gradient(circle at center,
+                  #52d68a 0%,
+                  rgba(82,214,138,0.98)  20%,
+                  rgba(59,184,235,0.92)  45%,
+                  rgba(16,38,32,0.98)    72%,
+                  #050c0a 100%);
+    }
+
+    #transition-overlay.flash {
+      opacity: 1;
+      transform: scale(1.6);
+    }
+
+    /* ============================================================
+       APP
+    ============================================================ */
+    #app-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      letter-spacing: -0.01em;
+      opacity: 0;
+      pointer-events: none;
+      display: none;
+      transition: opacity 0.96s ease-in-out;
+      will-change: opacity;
+    }
+    #app-screen.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #stars-canvas{
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      z-index: -2;
+      pointer-events: none;
+    }
+
+    .aura-glow {
+      position: fixed;
+      top: 0; left: 0;
+      width: 380px; height: 380px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(82,214,138,0.12) 0%, rgba(59,184,235,0.05) 45%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+      transform: translate(-50%, -50%);
+      transition: transform 0.08s ease-out;
+      will-change: transform;
+    }
+
+    .wrap{width:min(1180px,94vw);margin:0 auto;padding:32px 0 48px; position: relative; z-index: 1;}
+    #app-screen header{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:28px}
+    .brand{display:flex;align-items:center;gap:16px}
+    .logo-badge{
+      width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      box-shadow:0 0 20px rgba(82,214,138,0.3);
+      font-weight:700;font-size:14px;color:#04120e;letter-spacing:0.5px;
+    }
+    #app-screen h1{font-size:clamp(24px,3.5vw,36px);margin:0;font-weight:700;letter-spacing:-0.03em}
+    .sub{color:var(--muted);margin-top:2px;font-size:14px;font-weight:400}
+    .badge{padding:6px 14px;border:1px solid var(--line);background:rgba(11,25,21,.6);border-radius:999px;color:var(--muted);font-size:12px;font-weight:500;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+
+    .grid{display:grid;grid-template-columns:1.35fr .85fr;gap:22px}
+    .card{background:linear-gradient(180deg,rgba(16,38,32,.75),rgba(11,25,21,.85));border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);backdrop-filter: blur(12px);-webkit-backdrop-filter: blur(12px);}
+    .pad{padding:24px}
+    .camera{position:relative;overflow:hidden;min-height:540px;background:#030a08;border-radius:20px;border:1px solid var(--line)}
+    .camera canvas{width:100%;height:100%;object-fit:cover;display:block;}
+    .camera canvas.mirror { transform: scaleX(-1); }
+
+    .placeholder{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:40px;background:radial-gradient(circle,rgba(82,214,138,.04),transparent 50%)}
+    .placeholder h2{margin:0 0 8px;font-size:20px;font-weight:600}.placeholder p{color:var(--muted);max-width:380px;font-size:14px;line-height:1.5}
+    .scanline{pointer-events:none;position:absolute;left:0;right:0;top:15%;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);box-shadow:0 0 12px var(--accent);animation:scan 3s ease-in-out infinite;opacity:.8;will-change:top}
+    @keyframes scan{0%,100%{top:15%}50%{top:85%}}
+
+    .topPrediction{position:absolute;left:18px;right:18px;bottom:18px;padding:16px 20px;background:rgba(3,10,8,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(82,214,138,.2);border-radius:14px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .topPrediction strong{font-size:18px;font-weight:600}.confidence{font-size:28px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+
+    .sectionTitle{font-size:11px;text-transform:uppercase;letter-spacing:1.8px;color:var(--muted);margin:0 0 16px;font-weight:600}
+    #app-screen label{font-size:12px;color:var(--muted);font-weight:500}
+    #app-screen input[type=text]{width:100%;margin-top:8px;padding:12px 14px;background:#050c0a;color:var(--text);border:1px solid var(--line);border-radius:10px;outline:none;font-family:inherit;font-size:13px;transition:border-color .2s}
+    #app-screen input:focus{border-color:var(--accent)}
+
+    .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+    .btn{border:0;border-radius:10px;padding:11px 16px;font-weight:600;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s ease;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+    .primary{background:var(--accent);color:#030f0b}.primary:hover:not(:disabled){background:#62e399}
+    .secondary{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--line)}.secondary:hover:not(:disabled){background:rgba(255,255,255,0.09)}
+    .danger{background:rgba(224,92,101,0.1);color:var(--danger);border:1px solid rgba(224,92,101,0.2)}.danger:hover:not(:disabled){background:rgba(224,92,101,0.18)}
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+
+    .status{margin-top:14px;padding:10px 12px;border-radius:8px;background:#050c0a;border:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:500}
+    .status.ok{color:#8ee8b3;border-color:rgba(82,214,138,0.3)}
+    .status.err{color:#f59e9e;border-color:rgba(224,92,101,0.3)}
+
+    .result{display:flex;align-items:center;gap:18px;padding:18px;border:1px solid var(--line);background:#050c0a;border-radius:14px;margin-top:14px}
+
+    .spinner-box { width: 36px; height: 36px; display: grid; place-items: center; flex-shrink: 0; }
+    .spinner {
+      width: 26px;height: 26px;
+      border: 3px solid rgba(255,255,255,0.08);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .result h3{margin:0 0 3px;font-size:17px;font-weight:600}.result p{margin:0;color:var(--muted);font-size:13px;line-height:1.4}
+
+    .bars{display:grid;gap:10px;margin-top:16px}
+    .barRow{display:grid;grid-template-columns:110px 1fr 48px;align-items:center;gap:10px;font-size:12px;font-weight:500}
+    .track{height:6px;background:#050c0a;border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+    .fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .18s ease;will-change:width}
+    .pct{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+    .stat{padding:12px;border-radius:10px;background:#050c0a;border:1px solid var(--line)}
+    .stat b{display:block;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+    .stat span{font-size:11px;color:var(--muted);font-weight:500}
+
+    .tip{margin-top:16px;padding:14px;border-radius:12px;background:rgba(82,214,138,0.04);border:1px solid rgba(82,214,138,0.12);color:var(--muted);font-size:12px;line-height:1.5}
+    #app-screen footer{text-align:center;color:rgba(240,247,244,0.3);font-size:11px;margin-top:24px;font-weight:400}
+
+    @media(max-width:900px){
+      .grid{grid-template-columns:1fr}.camera{min-height:420px}
+      #app-screen header{align-items:flex-start}.badge{display:none}
+    }
+
+    /* ============================================================
+       REDUCCIÓN DE COSTO EN MÓVIL / TÁCTIL
+    ============================================================ */
+    @media (hover: none), (max-width: 900px) {
+      .btn-ecosort,
+      .card,
+      .badge,
+      .topPrediction {
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+      }
+      .btn-ecosort { box-shadow: 0 6px 20px rgba(0,0,0,.55), inset 0 0 10px rgba(82,214,138,.06); }
+      .card { box-shadow: 0 12px 30px rgba(0,0,0,.4); }
+      .btn-ecosort:hover { transform: none; } /* sin hover en táctil */
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="supernova-canvas"></canvas>
+  <canvas id="swarmCanvas"></canvas>
+
+  <button class="btn-ecosort" id="mainBtn" style="opacity:0; pointer-events:none;">
+    EcoSort<span class="ai-text">_AI</span>
+    <span class="arrow-icon">&rarr;</span>
+  </button>
+
+  <div id="transition-overlay"></div>
+
+  <div id="app-screen">
+    <canvas id="stars-canvas"></canvas>
+    <div class="aura-glow" id="aura"></div>
+
+    <div class="wrap">
+      <header>
+        <div class="brand">
+          <div class="logo-badge">AI</div>
+          <div>
+            <h1>EcoSort AI</h1>
+            <div class="sub">Sistema de clasificación de residuos mediante Visión por Computador</div>
+          </div>
+        </div>
+        <div class="badge">Teachable Machine + TensorFlow.js</div>
+      </header>
+
+      <div class="grid">
+        <section class="card camera" id="cameraCard">
+          <div id="webcam-container"></div>
+          <div class="placeholder" id="placeholder">
+            <div>
+              <h2>Estación de análisis lista</h2>
+              <p>Cargue la URL del modelo entrenado y active el sensor de cámara para iniciar la inferencia.</p>
+            </div>
+          </div>
+          <div class="scanline" id="scanline" style="display:none"></div>
+          <div class="topPrediction" id="topPrediction" style="display:none">
+            <div>
+              <small style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px">Clasificación Principal</small><br>
+              <strong id="winnerLabel">—</strong>
+            </div>
+            <div class="confidence" id="winnerPct">0%</div>
+          </div>
+        </section>
+
+        <aside>
+          <section class="card pad">
+            <p class="sectionTitle">1 · Parámetros del modelo</p>
+            <label>URL del modelo (Teachable Machine)
+              <input id="modelUrl" type="text" placeholder="https://teachablemachine.withgoogle.com/models/XXXXXX/" />
+            </label>
+            <div class="row">
+              <button class="btn primary" id="loadBtn">Cargar Modelo</button>
+              <button class="btn secondary" id="cameraBtn" disabled>Iniciar Cámara</button>
+              <button class="btn secondary" id="switchCamBtn" disabled>Alternar Cámara</button>
+              <button class="btn danger" id="stopBtn" disabled>Detener</button>
+            </div>
+            <div class="status" id="status">Esperando inicialización de modelo.</div>
+          </section>
+
+          <section class="card pad" style="margin-top:18px">
+            <p class="sectionTitle">2 · Telemetría y Resultados</p>
+            <div class="result">
+              <div class="spinner-box">
+                <div class="spinner"></div>
+              </div>
+              <div>
+                <h3 id="resultTitle">Esperando Inferencia</h3>
+                <p id="resultText">Inicialice el modelo para clasificar categorías como Plástico, Papel, Metal o Residuos Orgánicos.</p>
+              </div>
+            </div>
+            <div class="bars" id="bars"></div>
+            <div class="stats">
+              <div class="stat"><b id="frames">0</b><span>fotogramas</span></div>
+              <div class="stat"><b id="classes">0</b><span>clases</span></div>
+              <div class="stat"><b id="best">0%</b><span>confianza máx</span></div>
+            </div>
+            <div class="tip" id="tip">Nota: El algoritmo opera mediante reconocimiento de patrones visuales extraídos del conjunto de datos de entrenamiento.</div>
+          </section>
+        </aside>
+      </div>
+      <footer>EcoSort AI · La clasificación final está sujeta a normativas y protocolos locales de reciclaje.</footer>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       SCRIPT 1: PERF + AUDIO + SUPERNOVA + SWARM + TRANSICIONES
+  ============================================================ -->
+  <script>
+  (function(){
+    /* ============================================================
+       DETECCIÓN DE RENDIMIENTO
+    ============================================================ */
+    const ua = navigator.userAgent || '';
+    const IS_TOUCH = (navigator.maxTouchPoints || 0) > 0;
+    const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua) || (IS_TOUCH && window.innerWidth < 900);
+    const CORES = navigator.hardwareConcurrency || 2;
+    const MEM = navigator.deviceMemory || 4;
+    const LOW_END = IS_MOBILE && (CORES <= 4 || MEM <= 3);
+    const PERF = LOW_END ? 'low' : (IS_MOBILE ? 'medium' : 'high');
+
+    const CONFIG = {
+      high:   { swarmCount: 1000, snParticles: 600, dprCap: 2,   fps: 60, glyphBase: 32, glyphQuality: 2 },
+      medium: { swarmCount: 500,  snParticles: 320, dprCap: 1.5, fps: 45, glyphBase: 26, glyphQuality: 1.5 },
+      low:    { swarmCount: 280,  snParticles: 180, dprCap: 1,   fps: 30, glyphBase: 20, glyphQuality: 1 }
+    }[PERF];
+
+    function getDpr(){
+      return Math.min(window.devicePixelRatio || 1, CONFIG.dprCap);
+    }
+
+    /* ============================================================
+       AUDIO
+    ============================================================ */
+    const clickAudio      = new Audio('click.mp3');
+    const transicionAudio = new Audio('transicion.mp3');
+    clickAudio.preload = 'auto';
+    transicionAudio.preload = 'auto';
+    clickAudio.volume = 1.0;
+    transicionAudio.volume = 1.0;
+
+    // Desbloqueo de audio en la primera interacción (política de autoplay)
+    function unlockAudio(){
+      [clickAudio, transicionAudio].forEach(a => {
+        try {
+          const p = a.play();
+          if (p && p.then) p.then(() => { a.pause(); a.currentTime = 0; }).catch(()=>{});
+        } catch(e){}
+      });
+      document.removeEventListener('pointerdown', unlockAudio);
+      document.removeEventListener('touchstart',  unlockAudio);
+      document.removeEventListener('click',       unlockAudio);
+    }
+    document.addEventListener('pointerdown', unlockAudio, { once: true, passive: true });
+    document.addEventListener('touchstart',  unlockAudio, { once: true, passive: true });
+    document.addEventListener('click',       unlockAudio, { once: true });
+
+    function playClick(){
+      try {
+        clickAudio.currentTime = 0;
+        clickAudio.play().catch(()=>{});
+      } catch(e){}
+    }
+    function playTransition(){
+      try {
+        transicionAudio.currentTime = 0;
+        transicionAudio.play().catch(()=>{});
+      } catch(e){}
+    }
+
+    // Delegación de eventos: un único listener para todos los botones
+    document.addEventListener('click', (e) => {
+      const target = e.target.closest('button');
+      if (target) playClick();
+    }, true);
+
+    /* ============================================================
+       REFERENCIAS
+    ============================================================ */
+    const supernovaCanvasEl = document.getElementById('supernova-canvas');
+    const swarmCanvasEl     = document.getElementById('swarmCanvas');
+    const transitionOverlay = document.getElementById('transition-overlay');
+    const mainBtn           = document.getElementById('mainBtn');
+    const appScreen         = document.getElementById('app-screen');
+
+    const snCtx = supernovaCanvasEl.getContext('2d', { alpha: true, desynchronized: true });
+    const swCtx = swarmCanvasEl.getContext('2d', { alpha: true, desynchronized: true });
+
+    /* ============================================================
+       VISIBILIDAD: pausar cuando la pestaña no está visible
+    ============================================================ */
+    let tabVisible = !document.hidden;
+    document.addEventListener('visibilitychange', () => {
+      tabVisible = !document.hidden;
+      lastSnTime = 0;
+      lastSwTime = 0;
+      lastStarsTime = 0;
+    }, { passive: true });
+
+    /* ============================================================
+       1. SUPERNOVA  ·  25% más rápida + adaptativa
+    ============================================================ */
+    const SN_VELOCIDAD = 1.875;
+    const SN_PARTICLES = CONFIG.snParticles;
+
+    let snW = 0, snH = 0;
+
+    const SN_PALETTE = [
+      'rgba(82,214,138,',
+      'rgba(82,214,138,',
+      'rgba(59,184,235,',
+      'rgba(59,184,235,',
+      'rgba(240,247,244,'
+    ];
+
+    const supernova = {
+      x: 0, y: 0,
+      radius: 0,
+      alpha: 1,
+      active: true,
+      particles: [],
+      onEnd: null
+    };
+
+    function resizeSupernova() {
+      const dpr = getDpr();
+      snW = window.innerWidth;
+      snH = window.innerHeight;
+      supernovaCanvasEl.width  = Math.max(1, Math.floor(snW * dpr));
+      supernovaCanvasEl.height = Math.max(1, Math.floor(snH * dpr));
+      snCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      supernova.x = snW / 2;
+      supernova.y = snH / 2;
+    }
+
+    function initSupernova() {
+      supernova.radius = 0;
+      supernova.alpha  = 1;
+      supernova.active = true;
+      supernova.particles.length = 0;
+
+      for (let i = 0; i < SN_PARTICLES; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (Math.random() * 12 + 3) * SN_VELOCIDAD;
+        supernova.particles.push({
+          x: snW / 2, y: snH / 2,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: Math.random() * 4 + 1.5,
+          colorBase: SN_PALETTE[(Math.random() * SN_PALETTE.length) | 0],
+          alpha: 1
+        });
+      }
+    }
+
+    const SN_FRAME_INTERVAL = 1000 / Math.min(CONFIG.fps, 60);
+    let lastSnTime = 0;
+    let snGradient = null;
+    let snGradientRadius = -1;
+
+    function renderSupernova(now) {
+      requestAnimationFrame(renderSupernova);
+      if (!tabVisible) return;
+
+      if (now - lastSnTime < SN_FRAME_INTERVAL) return;
+      lastSnTime = now;
+
+      snCtx.clearRect(0, 0, snW, snH);
+
+      if (supernova.active) {
+        supernova.radius += 14 * SN_VELOCIDAD;
+        supernova.alpha  -= 0.008 * SN_VELOCIDAD;
+
+        const r = Math.max(1, supernova.radius);
+
+        // Reusar el gradiente si el radio no cambió significativamente
+        if (!snGradient || Math.abs(r - snGradientRadius) > 6) {
+          snGradient = snCtx.createRadialGradient(
+            supernova.x, supernova.y, 0,
+            supernova.x, supernova.y, r
+          );
+          snGradientRadius = r;
+        }
+
+        const a = Math.max(0, supernova.alpha);
+        // Recrear paradas cada frame (el gradiente cacheado no se puede editar)
+        const g = snCtx.createRadialGradient(supernova.x, supernova.y, 0, supernova.x, supernova.y, r);
+        g.addColorStop(0,    `rgba(255,255,255,${a})`);
+        g.addColorStop(0.15, `rgba(82,214,138,${a * 0.95})`);
+        g.addColorStop(0.45, `rgba(59,184,235,${a * 0.75})`);
+        g.addColorStop(0.75, `rgba(30,67,56,${a * 0.35})`);
+        g.addColorStop(1,    'rgba(0,0,0,0)');
+
+        snCtx.fillStyle = g;
+        snCtx.beginPath();
+        snCtx.arc(supernova.x, supernova.y, r, 0, Math.PI * 2);
+        snCtx.fill();
+
+        const parts = supernova.particles;
+        for (let i = 0; i < parts.length; i++) {
+          const p = parts[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.alpha -= 0.007 * SN_VELOCIDAD;
+          if (p.alpha > 0) {
+            snCtx.fillStyle = `${p.colorBase}${p.alpha})`;
+            snCtx.beginPath();
+            snCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            snCtx.fill();
+          }
+        }
+
+        if (supernova.alpha <= 0) {
+          supernova.active = false;
+          if (typeof supernova.onEnd === 'function') supernova.onEnd();
+        }
+      }
+    }
+
+    /* ============================================================
+       2. TYPOGRAPHY SWARM  ·  con glyphs pre-renderizados
+    ============================================================ */
+    const SW_COLORES = [
+      '#52d68a', '#52d68a', '#52d68a',
+      '#3bb8eb', '#3bb8eb', '#3bb8eb',
+      '#f0f7f4', '#f0f7f4', '#f0f7f4'
+    ];
+    const SW_CHARS = ['$', '#', '@', '&', '%', '}', '{', ']', '['];
+
+    const SW_AJUSTES = {
+      radioBase:    200,
+      recorteRadio: 0.20,
+      fluidez:      2.07,
+      empuje:       0.5,
+      retorno:      10
+    };
+
+    const SW_RADIO    = SW_AJUSTES.radioBase * (1 - SW_AJUSTES.recorteRadio);
+    const SW_RADIO_SQ = SW_RADIO * SW_RADIO;
+    const SW_EMPUJE   = SW_AJUSTES.empuje / SW_AJUSTES.fluidez;
+    const SW_RETORNO  = SW_AJUSTES.retorno * SW_AJUSTES.fluidez;
+    const SW_COUNT    = CONFIG.swarmCount;
+
+    /* ---------- Pre-render de glifos (mucho más rápido que fillText) ---------- */
+    const GLYPH_CACHE = {};
+    (function buildGlyphs(){
+      const base = CONFIG.glyphBase;
+      const dprG = Math.min(window.devicePixelRatio || 1, CONFIG.glyphQuality);
+      const size = Math.ceil(base * dprG);
+
+      for (let ci = 0; ci < SW_CHARS.length; ci++) {
+        const ch = SW_CHARS[ci];
+        for (let co = 0; co < SW_COLORES.length; co++) {
+          const color = SW_COLORES[co];
+          const key = ch + '|' + color;
+          if (GLYPH_CACHE[key]) continue;
+
+          const cv = document.createElement('canvas');
+          cv.width = cv.height = size;
+          const g = cv.getContext('2d');
+          g.scale(dprG, dprG);
+          g.font = base + 'px "Plus Jakarta Sans", sans-serif';
+          g.fillStyle = color;
+          g.textAlign = 'center';
+          g.textBaseline = 'middle';
+          g.fillText(ch, base / 2, base / 2 + base * 0.04);
+          GLYPH_CACHE[key] = cv;
+        }
+      }
+    })();
+
+    let swW = 0, swH = 0;
+    let particles = [];
+
+    const mouse = { x: undefined, y: undefined, active: false };
+
+    // Eventos de puntero unificados y pasivos
+    window.addEventListener('pointermove', (e) => {
+      mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+    }, { passive: true });
+
+    window.addEventListener('pointerleave', () => {
+      mouse.active = false; mouse.x = undefined; mouse.y = undefined;
+    }, { passive: true });
+
+    window.addEventListener('pointerdown', (e) => {
+      mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+    }, { passive: true });
+
+    // Fallback táctil si pointer events no están disponibles
+    if (!window.PointerEvent) {
+      window.addEventListener('touchmove', (e) => {
+        const t = e.touches[0];
+        if (t) { mouse.x = t.clientX; mouse.y = t.clientY; mouse.active = true; }
+      }, { passive: true });
+      window.addEventListener('touchend', () => {
+        mouse.active = false;
+      }, { passive: true });
+    }
+
+    class Particle {
+      constructor() {
+        this.reset(true);
+      }
+      reset(initial) {
+        this.x = Math.random() * swW;
+        this.y = Math.random() * swH;
+        this.baseX = this.x;
+        this.baseY = this.y;
+        this.char  = SW_CHARS[(Math.random() * SW_CHARS.length) | 0];
+        this.color = SW_COLORES[(Math.random() * SW_COLORES.length) | 0];
+        this.size  = Math.random() * 15 + 5;
+        this.density = Math.random() * 30 + 1;
+        this.glyph = GLYPH_CACHE[this.char + '|' + this.color];
+        if (initial) { /* nada extra */ }
+      }
+      draw() {
+        const s = this.size;
+        swCtx.drawImage(this.glyph, this.x - s * 0.5, this.y - s * 0.5, s, s);
+      }
+      update() {
+        if (mouse.active) {
+          const dx = mouse.x - this.x;
+          const dy = mouse.y - this.y;
+          const d2 = dx * dx + dy * dy;
+
+          if (d2 < SW_RADIO_SQ) {
+            const distance = Math.sqrt(d2) || 0.0001;
+            const force = (SW_RADIO - distance) / SW_RADIO;
+            const fdx = dx / distance;
+            const fdy = dy / distance;
+            this.x -= fdx * force * this.density * SW_EMPUJE * 2.2;
+            this.y -= fdy * force * this.density * SW_EMPUJE * 2.2;
+            return;
+          }
+        }
+        // Regreso suave
+        const rx = this.x - this.baseX;
+        const ry = this.y - this.baseY;
+        if (rx !== 0 || ry !== 0) {
+          this.x -= rx / SW_RETORNO;
+          this.y -= ry / SW_RETORNO;
+        }
+      }
+    }
+
+    function initSwarm() {
+      particles = new Array(SW_COUNT);
+      for (let i = 0; i < SW_COUNT; i++) particles[i] = new Particle();
+    }
+
+    const SW_FRAME_INTERVAL = 1000 / CONFIG.fps;
+    let lastSwTime = 0;
+
+    function animateSwarm(now) {
+      requestAnimationFrame(animateSwarm);
+      if (!tabVisible) return;
+
+      const delta = now - lastSwTime;
+      if (delta < SW_FRAME_INTERVAL - 2) return;
+      lastSwTime = now;
+
+      swCtx.clearRect(0, 0, swW, swH);
+
+      const n = particles.length;
+      for (let i = 0; i < n; i++) {
+        particles[i].update();
+      }
+      for (let i = 0; i < n; i++) {
+        particles[i].draw();
+      }
+    }
+
+    function resizeSwarm() {
+      const dpr = getDpr();
+      swW = window.innerWidth;
+      swH = window.innerHeight;
+      swarmCanvasEl.width  = Math.max(1, Math.floor(swW * dpr));
+      swarmCanvasEl.height = Math.max(1, Math.floor(swH * dpr));
+      swCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      initSwarm();
+    }
+
+    /* ============================================================
+       3. TRANSICIÓN SUPERNOVA → SWARM
+    ============================================================ */
+    function runTransition() {
+      playTransition();
+
+      transitionOverlay.classList.add('flash');
+
+      setTimeout(() => {
+        supernovaCanvasEl.style.opacity = '0';
+        swarmCanvasEl.style.opacity     = '1';
+      }, 400);
+
+      setTimeout(() => {
+        transitionOverlay.classList.remove('flash');
+      }, 680);
+
+      setTimeout(() => {
+        mainBtn.style.opacity = '1';
+        mainBtn.style.pointerEvents = 'auto';
+      }, 1000);
+
+      setTimeout(() => {
+        supernovaCanvasEl.style.display = 'none';
+      }, 960);
+    }
+
+    supernova.onEnd = runTransition;
+
+    /* ============================================================
+       4. TRANSICIÓN SWARM → APP
+    ============================================================ */
+    let appEntered = false;
+
+    mainBtn.addEventListener('click', () => {
+      if (appEntered) return;
+      appEntered = true;
+
+      playTransition();
+
+      mainBtn.classList.add('pulse');
+      mainBtn.style.pointerEvents = 'none';
+
+      transitionOverlay.classList.add('app-enter');
+
+      requestAnimationFrame(() => {
+        transitionOverlay.classList.add('flash');
+      });
+
+      setTimeout(() => {
+        swarmCanvasEl.style.opacity = '0';
+        mainBtn.style.opacity       = '0';
+      }, 280);
+
+      setTimeout(() => {
+        appScreen.style.display = 'block';
+        void appScreen.offsetHeight;
+        requestAnimationFrame(() => {
+          appScreen.classList.add('visible');
+        });
+      }, 520);
+
+      setTimeout(() => {
+        transitionOverlay.classList.remove('flash');
+      }, 800);
+
+      setTimeout(() => {
+        transitionOverlay.classList.remove('app-enter');
+        swarmCanvasEl.style.display = 'none';
+      }, 1360);
+    });
+
+    /* ============================================================
+       5. RESIZE DEBOUNCED
+    ============================================================ */
+    let resizeTimer = 0;
+    function handleResize(){
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        resizeSupernova();
+        if (supernova.active) initSupernova();
+        resizeSwarm();
+      }, 200);
+    }
+    window.addEventListener('resize', handleResize, { passive: true });
+    window.addEventListener('orientationchange', handleResize, { passive: true });
+
+    /* ============================================================
+       6. ARRANQUE
+    ============================================================ */
+    resizeSupernova();
+    resizeSwarm();
+
+    initSupernova();
+    initSwarm();
+
+    requestAnimationFrame(renderSupernova);
+    requestAnimationFrame(animateSwarm);
+  })();
+  </script>
+
+  <!-- ============================================================
+       SCRIPT 2: LÓGICA APP EcoSort AI
+  ============================================================ -->
+  <script>
+  (function(){
+    let model=null, webcam=null, maxPredictions=0, running=false, frameCount=0;
+    let useFacingMode = "user";
+    let rafId = 0;
+
+    const $ = id => document.getElementById(id);
+    const advice = {
+      "plastico": ["Plástico Detectado", "Verifique que el contenedor esté libre de líquidos antes de clasificar para reciclaje."],
+      "plástico": ["Plástico Detectado", "Verifique que el contenedor esté libre de líquidos antes de clasificar para reciclaje."],
+      "papel":    ["Papel / Cartón", "Asegúrese de que el material permanezca seco y libre de grasas."],
+      "carton":   ["Papel / Cartón", "Asegúrese de que el material permanezca seco y libre de grasas."],
+      "cartón":   ["Papel / Cartón", "Asegúrese de que el material permanezca seco y libre de grasas."],
+      "metal":    ["Metal / Aluminio", "Los envases metálicos pueden procesarse si se encuentran vacíos y descontaminados."],
+      "organico": ["Residuo Orgánico", "Apto para procesos de compostaje o tratamiento de biomasa."],
+      "orgánico": ["Residuo Orgánico", "Apto para procesos de compostaje o tratamiento de biomasa."],
+      "otros":    ["Residuo General", "Consulte los protocolos locales para su correcto desecho."],
+      "no reciclable": ["No Reciclable", "Depositar en la fracción de rechazo según la normativa vigente."]
+    };
+
+    function normalizeUrl(v){ v=v.trim(); if(!v) return ""; return v.endsWith("/")?v:v+"/"; }
+    function setStatus(msg,type=""){ const el=$("status"); el.textContent=msg; el.className="status "+type; }
+    function saveUrl(v){ try{ localStorage.setItem("ecosort_model_url",v); }catch(e){} }
+
+    async function loadModel(){
+      try{
+        const url=normalizeUrl($("modelUrl").value);
+        if(!url){ setStatus("Ingrese una URL válida del modelo.","err"); return; }
+        setStatus("Cargando estructura del modelo…");
+        model=await tmImage.load(url+"model.json",url+"metadata.json");
+        maxPredictions=model.getTotalClasses(); $("classes").textContent=maxPredictions; saveUrl(url);
+        createBars(model.getClassLabels ? model.getClassLabels() : []);
+        $("cameraBtn").disabled=false;
+        $("switchCamBtn").disabled=false;
+        setStatus("Modelo cargado. Sistema listo para captura.","ok");
+        $("resultTitle").textContent="Modelo operacional";
+        $("resultText").textContent=`${maxPredictions} clases detectadas.`;
+      }catch(e){ console.error(e); setStatus("Error al cargar el modelo. Verifique la URL y red.","err"); }
+    }
+
+    function createBars(labels){
+      const box=$("bars"); box.innerHTML="";
+      const frag = document.createDocumentFragment();
+      (labels.length?labels:Array.from({length:maxPredictions},(_,i)=>`Clase ${i+1}`)).forEach((name,i)=>{
+        const row=document.createElement("div");
+        row.className="barRow";
+        row.innerHTML=`<span id="label-${i}">${name}</span><div class="track"><div class="fill" id="fill-${i}"></div></div><span class="pct" id="pct-${i}">0%</span>`;
+        frag.appendChild(row);
+      });
+      box.appendChild(frag);
+    }
+
+    async function startCamera(){
+      try{
+        if(!model){setStatus("Requiere cargar un modelo antes de activar la cámara.","err");return;}
+
+        if(webcam) { try{ await webcam.stop(); }catch(e){} webcam = null; }
+
+        const flip = (useFacingMode === "user");
+        webcam = new tmImage.Webcam(640, 480, flip);
+
+        await webcam.setup({ facingMode: useFacingMode });
+        await webcam.play();
+        running=true;
+
+        const container = $("webcam-container");
+        container.innerHTML = "";
+        container.appendChild(webcam.canvas);
+
+        if (flip) webcam.canvas.classList.add("mirror");
+        else      webcam.canvas.classList.remove("mirror");
+
+        $("placeholder").style.display="none";
+        $("scanline").style.display="block";
+        $("topPrediction").style.display="flex";
+        $("cameraBtn").disabled=true;
+        $("stopBtn").disabled=false;
+        setStatus(`Sensor activo (${useFacingMode === "user" ? "Frontal" : "Posterior"}).`,"ok");
+
+        cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(loop);
+      }catch(e){console.error(e);setStatus("Error de acceso a la cámara. Verifique los permisos.","err");}
+    }
+
+    async function switchCamera(){
+      useFacingMode = (useFacingMode === "user") ? "environment" : "user";
+      if(running){
+        await startCamera();
+      } else {
+        setStatus(`Cámara alternada a modo ${useFacingMode === "user" ? "Frontal" : "Posterior"}.`,"ok");
+      }
+    }
+
+    async function loop(){
+      if(!running) return;
+      try {
+        webcam.update();
+        await predict();
+      } catch(e){ /* ignorar frames perdidos */ }
+      rafId = requestAnimationFrame(loop);
+    }
+
+    async function predict(){
+      const preds=await model.predict(webcam.canvas);
+      frameCount++; $("frames").textContent=frameCount;
+      preds.forEach((p,i)=>{
+        const pct=Math.round(p.probability*100);
+        const label=$("label-"+i); if(label) label.textContent=p.className;
+        const fill=$("fill-"+i); if(fill) fill.style.width=pct+"%";
+        const pctEl=$("pct-"+i); if(pctEl) pctEl.textContent=pct+"%";
+      });
+      const winner=preds.reduce((a,b)=>a.probability>b.probability?a:b);
+      const wp=Math.round(winner.probability*100);
+      $("winnerLabel").textContent=winner.className;
+      $("winnerPct").textContent=wp+"%";
+      $("best").textContent=wp+"%";
+      showAdvice(winner.className,wp);
+    }
+
+    function showAdvice(name,pct){
+      const key=name.toLowerCase().trim(); let found=null;
+      for(const k in advice){ if(key.includes(k)){found=advice[k];break;} }
+      if(!found) found=[name,"Categoría identificada en el modelo de entrenamiento."];
+      $("resultTitle").textContent=found[0];
+      $("resultText").textContent = pct<60
+        ? `Índice de confianza bajo (${pct}%). Mejore la iluminación o la distancia de captura.`
+        : found[1];
+    }
+
+    function stopCamera(){
+      running=false;
+      cancelAnimationFrame(rafId);
+      if(webcam){ try{ webcam.stop(); }catch(e){} webcam=null; }
+      $("webcam-container").innerHTML="";
+      $("placeholder").style.display="grid";
+      $("scanline").style.display="none";
+      $("topPrediction").style.display="none";
+      $("cameraBtn").disabled=!model;
+      $("stopBtn").disabled=true;
+      setStatus("Captura suspendida. Modelo en memoria.");
+    }
+
+    $("loadBtn").addEventListener("click",loadModel);
+    $("cameraBtn").addEventListener("click",startCamera);
+    $("switchCamBtn").addEventListener("click",switchCamera);
+    $("stopBtn").addEventListener("click",stopCamera);
+
+    try {
+      const saved=localStorage.getItem("ecosort_model_url");
+      if(saved) $("modelUrl").value=saved;
+    } catch(e){}
+
+    /* --- Aura Interactiva (throttled con rAF) --- */
+    const aura = $("aura");
+    let auraX = 0, auraY = 0, auraQueued = false;
+    window.addEventListener('pointermove', (e) => {
+      auraX = e.clientX; auraY = e.clientY;
+      if (!auraQueued) {
+        auraQueued = true;
+        requestAnimationFrame(() => {
+          aura.style.transform = `translate(calc(${auraX}px - 50%), calc(${auraY}px - 50%))`;
+          auraQueued = false;
+        });
+      }
+    }, { passive: true });
+
+    /* ============================================================
+       ESTRELLAS  ·  velocidad +80% + adaptativas + rAF throttled
+    ============================================================ */
+    const starsCanvas = $("stars-canvas");
+    const starsCtx = starsCanvas.getContext("2d", { alpha: true, desynchronized: true });
+
+    const IS_MOBILE_STARS = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent) || ((navigator.maxTouchPoints||0)>0 && window.innerWidth<900);
+    const numStars = IS_MOBILE_STARS ? 100 : 180;
+
+    let stars = [];
+
+    function resizeStarsCanvas(){
+      const dpr = Math.min(window.devicePixelRatio || 1, IS_MOBILE_STARS ? 1.5 : 2);
+      starsCanvas.width  = Math.max(1, Math.floor(window.innerWidth  * dpr));
+      starsCanvas.height = Math.max(1, Math.floor(window.innerHeight * dpr));
+      starsCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    let starsResizeTimer = 0;
+    window.addEventListener("resize", () => {
+      clearTimeout(starsResizeTimer);
+      starsResizeTimer = setTimeout(resizeStarsCanvas, 200);
+    }, { passive: true });
+    resizeStarsCanvas();
+
+    const SW_STARS_W = () => starsCanvas.width  / (window.devicePixelRatio || 1);
+    const SW_STARS_H = () => starsCanvas.height / (window.devicePixelRatio || 1);
+
+    for(let i = 0; i < numStars; i++){
+      stars.push({
+        x: Math.random() * SW_STARS_W(),
+        y: Math.random() * SW_STARS_H(),
+        radius: Math.random() * 1.4 + 0.4,
+        alpha: Math.random() * 0.8 + 0.2,
+        speed: Math.random() * 0.63 + 0.18
+      });
+    }
+
+    let tabVisible = !document.hidden;
+    document.addEventListener('visibilitychange', () => { tabVisible = !document.hidden; }, { passive: true });
+
+    const STARS_FRAME_INTERVAL = 1000 / (IS_MOBILE_STARS ? 30 : 60);
+    let lastStarsTime = 0;
+
+    function animateStars(now){
+      requestAnimationFrame(animateStars);
+      if (!tabVisible) return;
+      if (now - lastStarsTime < STARS_FRAME_INTERVAL) return;
+      lastStarsTime = now;
+
+      const w = SW_STARS_W();
+      const h = SW_STARS_H();
+      starsCtx.clearRect(0, 0, w, h);
+      for (let i = 0; i < stars.length; i++) {
+        const s = stars[i];
+        s.y -= s.speed;
+        if (s.y < 0) {
+          s.y = h;
+          s.x = Math.random() * w;
+        }
+        starsCtx.beginPath();
+        starsCtx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+        starsCtx.fillStyle = `rgba(255,255,255,${s.alpha})`;
+        starsCtx.fill();
+      }
+    }
+    requestAnimationFrame(animateStars);
+  })();
+  </script>
+
+</body>
+</html>
