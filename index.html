@@ -6,6 +6,10 @@
   <meta name="theme-color" content="#050c0a">
   <title>EcoSort_AI · Experiencia Completa</title>
 
+  <!--  Favicon con el logo EcoSort -->
+  <link rel="icon" type="image/svg+xml" href="ecosort.svg">
+  <link rel="alternate icon" type="image/svg+xml" href="ecosort.svg">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -319,10 +323,6 @@
 
     .result{display:flex;align-items:center;gap:18px;padding:18px;border:1px solid var(--line);background:#050c0a;border-radius:14px;margin-top:14px}
 
-    /* ============================================================
-       SPINNER REDISEÑADO — visible y robusto
-       Se anima con CSS + se refuerza con JS inline !important
-    ============================================================ */
     .spinner-box {
       width: 44px;
       height: 44px;
@@ -334,7 +334,6 @@
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      /* Rueda de carga tipo conic-gradient: mucho más visible */
       background: conic-gradient(from 0deg,
                   rgba(82,214,138,0) 0%,
                   rgba(82,214,138,0.25) 25%,
@@ -391,7 +390,6 @@
       .btn-ecosort:hover { transform: none; }
     }
 
-    /* Reduce-motion: respeta preferencias, PERO el spinner siempre gira */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.001ms !important;
@@ -496,9 +494,6 @@
 
   <!-- ============================================================
        SCRIPT 0: FORZAR SPINNER (independiente de todo)
-       Se ejecuta ANTES que cualquier otro script para asegurar
-       que la rueda de carga siempre gire, incluso si el sistema
-       operativo tiene activada la opción "reducir movimiento".
   ============================================================ -->
   <script>
   (function forceSpinner(){
@@ -506,7 +501,6 @@
       const spinners = document.querySelectorAll('.spinner');
       for (let i = 0; i < spinners.length; i++) {
         const el = spinners[i];
-        // 1) Refuerzo CSS inline con !important (gana a cualquier regla)
         if (!el.dataset.forced) {
           el.dataset.forced = '1';
           el.style.setProperty('animation', 'spin 0.85s linear infinite', 'important');
@@ -515,16 +509,12 @@
           el.style.setProperty('animation-timing-function', 'linear', 'important');
           el.style.setProperty('animation-name', 'spin', 'important');
         }
-        // 2) Refuerzo JS: si por alguna razón el navegador ignora
-        //    la animación CSS, rotamos manualmente con rAF.
         const cs = window.getComputedStyle(el);
         const t  = cs.transform;
-        // Si el transform se queda congelado en "none" tras 100ms, aplicamos fallback
         if (el._forceRotate) {
           const deg = ((now || performance.now()) / 850 * 360) % 360;
           el.style.transform = 'rotate(' + deg + 'deg)';
         } else if (t === 'none' && (now || performance.now()) > 200) {
-          // El navegador no está animando: activar modo manual
           el._forceRotate = true;
         }
       }
