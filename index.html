@@ -58,9 +58,6 @@
       overscroll-behavior: none;
     }
 
-    /* ============================================================
-       CANVAS
-    ============================================================ */
     #supernova-canvas,
     #swarmCanvas,
     #stars-canvas {
@@ -105,9 +102,6 @@
       transform: scale(1);
     }
 
-    /* ============================================================
-       BOTÓN
-    ============================================================ */
     .btn-ecosort {
       position: relative;
       z-index: 10;
@@ -186,9 +180,6 @@
       100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(82,214,138,0);   }
     }
 
-    /* ============================================================
-       OVERLAY DE TRANSICIÓN
-    ============================================================ */
     #transition-overlay {
       position: fixed;
       inset: 0;
@@ -233,9 +224,6 @@
                   filter   1.3s var(--ease-out);
     }
 
-    /* ============================================================
-       APP
-    ============================================================ */
     #app-screen {
       position: fixed;
       inset: 0;
@@ -331,18 +319,45 @@
 
     .result{display:flex;align-items:center;gap:18px;padding:18px;border:1px solid var(--line);background:#050c0a;border-radius:14px;margin-top:14px}
 
-    .spinner-box { width: 36px; height: 36px; display: grid; place-items: center; flex-shrink: 0; }
-    .spinner {
-      width: 26px;
-      height: 26px;
-      border: 3px solid rgba(255,255,255,0.08);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.9s linear infinite;
+    /* ============================================================
+       SPINNER REDISEÑADO — visible y robusto
+       Se anima con CSS + se refuerza con JS inline !important
+    ============================================================ */
+    .spinner-box {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      /* Rueda de carga tipo conic-gradient: mucho más visible */
+      background: conic-gradient(from 0deg,
+                  rgba(82,214,138,0) 0%,
+                  rgba(82,214,138,0.25) 25%,
+                  rgba(82,214,138,0.85) 70%,
+                  #52d68a 92%,
+                  #3bb8eb 100%);
+      -webkit-mask: radial-gradient(farthest-side,
+                     transparent calc(100% - 4px),
+                     #000 calc(100% - 4px));
+              mask: radial-gradient(farthest-side,
+                     transparent calc(100% - 4px),
+                     #000 calc(100% - 4px));
+      animation: spin 0.85s linear infinite;
+      will-change: transform;
+      box-shadow: 0 0 14px rgba(82,214,138,0.35);
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
 
-    .result h3{margin:0 0 3px;font-size:17px;font-weight:600}.result p{margin:0;color:var(--muted);font-size:13px;line-height:1.4}
+    .result h3{margin:0 0 3px;font-size:17px;font-weight:600}
+    .result p{margin:0;color:var(--muted);font-size:13px;line-height:1.4}
 
     .bars{display:grid;gap:10px;margin-top:16px}
     .barRow{display:grid;grid-template-columns:110px 1fr 48px;align-items:center;gap:10px;font-size:12px;font-weight:500}
@@ -376,23 +391,16 @@
       .btn-ecosort:hover { transform: none; }
     }
 
-    /* ============================================================
-       REDUCE MOTION
-       - Se respetan las preferencias del usuario,
-         pero el spinner se mantiene girando porque es un
-         indicador FUNCIONAL, no decorativo.
-    ============================================================ */
+    /* Reduce-motion: respeta preferencias, PERO el spinner siempre gira */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.001ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.001ms !important;
       }
-
-      /* Excepción: el spinner debe seguir girando siempre */
       .spinner {
-        animation: spin 0.9s linear infinite !important;
-        animation-duration: 0.9s !important;
+        animation: spin 0.85s linear infinite !important;
+        animation-duration: 0.85s !important;
         animation-iteration-count: infinite !important;
         animation-timing-function: linear !important;
       }
@@ -465,7 +473,7 @@
             <p class="sectionTitle">2 · Telemetría y Resultados</p>
             <div class="result">
               <div class="spinner-box">
-                <div class="spinner"></div>
+                <div class="spinner" id="spinner"></div>
               </div>
               <div>
                 <h3 id="resultTitle">Esperando Inferencia</h3>
@@ -487,13 +495,50 @@
   </div>
 
   <!-- ============================================================
+       SCRIPT 0: FORZAR SPINNER (independiente de todo)
+       Se ejecuta ANTES que cualquier otro script para asegurar
+       que la rueda de carga siempre gire, incluso si el sistema
+       operativo tiene activada la opción "reducir movimiento".
+  ============================================================ -->
+  <script>
+  (function forceSpinner(){
+    function apply(now){
+      const spinners = document.querySelectorAll('.spinner');
+      for (let i = 0; i < spinners.length; i++) {
+        const el = spinners[i];
+        // 1) Refuerzo CSS inline con !important (gana a cualquier regla)
+        if (!el.dataset.forced) {
+          el.dataset.forced = '1';
+          el.style.setProperty('animation', 'spin 0.85s linear infinite', 'important');
+          el.style.setProperty('animation-duration', '0.85s', 'important');
+          el.style.setProperty('animation-iteration-count', 'infinite', 'important');
+          el.style.setProperty('animation-timing-function', 'linear', 'important');
+          el.style.setProperty('animation-name', 'spin', 'important');
+        }
+        // 2) Refuerzo JS: si por alguna razón el navegador ignora
+        //    la animación CSS, rotamos manualmente con rAF.
+        const cs = window.getComputedStyle(el);
+        const t  = cs.transform;
+        // Si el transform se queda congelado en "none" tras 100ms, aplicamos fallback
+        if (el._forceRotate) {
+          const deg = ((now || performance.now()) / 850 * 360) % 360;
+          el.style.transform = 'rotate(' + deg + 'deg)';
+        } else if (t === 'none' && (now || performance.now()) > 200) {
+          // El navegador no está animando: activar modo manual
+          el._forceRotate = true;
+        }
+      }
+      requestAnimationFrame(apply);
+    }
+    requestAnimationFrame(apply);
+  })();
+  </script>
+
+  <!-- ============================================================
        SCRIPT 1: PERF + AUDIO + SUPERNOVA + SWARM + TRANSICIONES
   ============================================================ -->
   <script>
   (function(){
-    /* ============================================================
-       DETECCIÓN DE RENDIMIENTO
-    ============================================================ */
     const ua = navigator.userAgent || '';
     const IS_TOUCH = (navigator.maxTouchPoints || 0) > 0;
     const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua) || (IS_TOUCH && window.innerWidth < 900);
@@ -508,13 +553,8 @@
       low:    { swarmCount: 280,  snParticles: 180, dprCap: 1,   fps: 30, glyphBase: 20, glyphQuality: 1 }
     }[PERF];
 
-    function getDpr(){
-      return Math.min(window.devicePixelRatio || 1, CONFIG.dprCap);
-    }
+    function getDpr(){ return Math.min(window.devicePixelRatio || 1, CONFIG.dprCap); }
 
-    /* ============================================================
-       AUDIO
-    ============================================================ */
     const clickAudio      = new Audio('click.mp3');
     const transicionAudio = new Audio('transicion.mp3');
     clickAudio.preload = 'auto';
@@ -538,16 +578,10 @@
     document.addEventListener('click',       unlockAudio, { once: true });
 
     function playClick(){
-      try {
-        clickAudio.currentTime = 0;
-        clickAudio.play().catch(()=>{});
-      } catch(e){}
+      try { clickAudio.currentTime = 0; clickAudio.play().catch(()=>{}); } catch(e){}
     }
     function playTransition(){
-      try {
-        transicionAudio.currentTime = 0;
-        transicionAudio.play().catch(()=>{});
-      } catch(e){}
+      try { transicionAudio.currentTime = 0; transicionAudio.play().catch(()=>{}); } catch(e){}
     }
 
     document.addEventListener('click', (e) => {
@@ -555,9 +589,6 @@
       if (target) playClick();
     }, true);
 
-    /* ============================================================
-       REFERENCIAS
-    ============================================================ */
     const supernovaCanvasEl = document.getElementById('supernova-canvas');
     const swarmCanvasEl     = document.getElementById('swarmCanvas');
     const transitionOverlay = document.getElementById('transition-overlay');
@@ -567,9 +598,6 @@
     const snCtx = supernovaCanvasEl.getContext('2d', { alpha: true, desynchronized: true });
     const swCtx = swarmCanvasEl.getContext('2d', { alpha: true, desynchronized: true });
 
-    /* ============================================================
-       VISIBILIDAD
-    ============================================================ */
     let tabVisible = !document.hidden;
     document.addEventListener('visibilitychange', () => {
       tabVisible = !document.hidden;
@@ -577,57 +605,40 @@
       lastSwTime = 0;
     }, { passive: true });
 
-    /* ============================================================
-       1. SUPERNOVA
-    ============================================================ */
+    /* ---------------- SUPERNOVA ---------------- */
     const SN_VELOCIDAD = 1.875;
     const SN_PARTICLES = CONFIG.snParticles;
-
     let snW = 0, snH = 0;
 
     const SN_PALETTE = [
-      'rgba(82,214,138,',
-      'rgba(82,214,138,',
-      'rgba(59,184,235,',
-      'rgba(59,184,235,',
+      'rgba(82,214,138,','rgba(82,214,138,',
+      'rgba(59,184,235,','rgba(59,184,235,',
       'rgba(240,247,244,'
     ];
 
-    const supernova = {
-      x: 0, y: 0,
-      radius: 0,
-      alpha: 1,
-      active: true,
-      particles: [],
-      onEnd: null
-    };
+    const supernova = { x:0, y:0, radius:0, alpha:1, active:true, particles:[], onEnd:null };
 
-    function resizeSupernova() {
+    function resizeSupernova(){
       const dpr = getDpr();
-      snW = window.innerWidth;
-      snH = window.innerHeight;
+      snW = window.innerWidth; snH = window.innerHeight;
       supernovaCanvasEl.width  = Math.max(1, Math.floor(snW * dpr));
       supernovaCanvasEl.height = Math.max(1, Math.floor(snH * dpr));
       snCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      supernova.x = snW / 2;
-      supernova.y = snH / 2;
+      supernova.x = snW/2; supernova.y = snH/2;
     }
 
-    function initSupernova() {
-      supernova.radius = 0;
-      supernova.alpha  = 1;
-      supernova.active = true;
+    function initSupernova(){
+      supernova.radius = 0; supernova.alpha = 1; supernova.active = true;
       supernova.particles.length = 0;
-
-      for (let i = 0; i < SN_PARTICLES; i++) {
+      for (let i = 0; i < SN_PARTICLES; i++){
         const angle = Math.random() * Math.PI * 2;
         const speed = (Math.random() * 12 + 3) * SN_VELOCIDAD;
         supernova.particles.push({
-          x: snW / 2, y: snH / 2,
+          x: snW/2, y: snH/2,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           size: Math.random() * 4 + 1.5,
-          colorBase: SN_PALETTE[(Math.random() * SN_PALETTE.length) | 0],
+          colorBase: SN_PALETTE[(Math.random()*SN_PALETTE.length)|0],
           alpha: 1
         });
       }
@@ -636,16 +647,15 @@
     const SN_FRAME_INTERVAL = 1000 / Math.min(CONFIG.fps, 60);
     let lastSnTime = 0;
 
-    function renderSupernova(now) {
+    function renderSupernova(now){
       requestAnimationFrame(renderSupernova);
       if (!tabVisible) return;
-
       if (now - lastSnTime < SN_FRAME_INTERVAL) return;
       lastSnTime = now;
 
       snCtx.clearRect(0, 0, snW, snH);
 
-      if (supernova.active) {
+      if (supernova.active){
         supernova.radius += 14 * SN_VELOCIDAD;
         supernova.alpha  -= 0.008 * SN_VELOCIDAD;
 
@@ -654,59 +664,48 @@
 
         const g = snCtx.createRadialGradient(supernova.x, supernova.y, 0, supernova.x, supernova.y, r);
         g.addColorStop(0,    `rgba(255,255,255,${a})`);
-        g.addColorStop(0.15, `rgba(82,214,138,${a * 0.95})`);
-        g.addColorStop(0.45, `rgba(59,184,235,${a * 0.75})`);
-        g.addColorStop(0.75, `rgba(30,67,56,${a * 0.35})`);
+        g.addColorStop(0.15, `rgba(82,214,138,${a*0.95})`);
+        g.addColorStop(0.45, `rgba(59,184,235,${a*0.75})`);
+        g.addColorStop(0.75, `rgba(30,67,56,${a*0.35})`);
         g.addColorStop(1,    'rgba(0,0,0,0)');
 
         snCtx.fillStyle = g;
         snCtx.beginPath();
-        snCtx.arc(supernova.x, supernova.y, r, 0, Math.PI * 2);
+        snCtx.arc(supernova.x, supernova.y, r, 0, Math.PI*2);
         snCtx.fill();
 
         const parts = supernova.particles;
-        for (let i = 0; i < parts.length; i++) {
+        for (let i = 0; i < parts.length; i++){
           const p = parts[i];
-          p.x += p.vx;
-          p.y += p.vy;
+          p.x += p.vx; p.y += p.vy;
           p.alpha -= 0.007 * SN_VELOCIDAD;
-          if (p.alpha > 0) {
+          if (p.alpha > 0){
             snCtx.fillStyle = `${p.colorBase}${p.alpha})`;
             snCtx.beginPath();
-            snCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            snCtx.arc(p.x, p.y, p.size, 0, Math.PI*2);
             snCtx.fill();
           }
         }
 
-        if (supernova.alpha <= 0) {
+        if (supernova.alpha <= 0){
           supernova.active = false;
           if (typeof supernova.onEnd === 'function') supernova.onEnd();
         }
       }
     }
 
-    /* ============================================================
-       2. TYPOGRAPHY SWARM
-    ============================================================ */
+    /* ---------------- SWARM ---------------- */
     const SW_COLORES = [
-      '#52d68a', '#52d68a', '#52d68a',
-      '#3bb8eb', '#3bb8eb', '#3bb8eb',
-      '#f0f7f4', '#f0f7f4', '#f0f7f4'
+      '#52d68a','#52d68a','#52d68a',
+      '#3bb8eb','#3bb8eb','#3bb8eb',
+      '#f0f7f4','#f0f7f4','#f0f7f4'
     ];
-    const SW_CHARS = ['$', '#', '@', '&', '%', '}', '{', ']', '['];
+    const SW_CHARS = ['$','#','@','&','%','}','{',']','['];
 
-    const SW_AJUSTES = {
-      radioBase:    200,
-      recorteRadio: 0.20,
-      fluidez:      2.07,
-      empuje:       0.5,
-      retorno:      10
-    };
-
-    const SW_RADIO    = SW_AJUSTES.radioBase * (1 - SW_AJUSTES.recorteRadio);
+    const SW_RADIO    = 200 * (1 - 0.20);
     const SW_RADIO_SQ = SW_RADIO * SW_RADIO;
-    const SW_EMPUJE   = SW_AJUSTES.empuje / SW_AJUSTES.fluidez;
-    const SW_RETORNO  = SW_AJUSTES.retorno * SW_AJUSTES.fluidez;
+    const SW_EMPUJE   = 0.5 / 2.07;
+    const SW_RETORNO  = 10 * 2.07;
     const SW_COUNT    = CONFIG.swarmCount;
 
     const GLYPH_CACHE = {};
@@ -714,14 +713,12 @@
       const base = CONFIG.glyphBase;
       const dprG = Math.min(window.devicePixelRatio || 1, CONFIG.glyphQuality);
       const size = Math.ceil(base * dprG);
-
-      for (let ci = 0; ci < SW_CHARS.length; ci++) {
+      for (let ci = 0; ci < SW_CHARS.length; ci++){
         const ch = SW_CHARS[ci];
-        for (let co = 0; co < SW_COLORES.length; co++) {
+        for (let co = 0; co < SW_COLORES.length; co++){
           const color = SW_COLORES[co];
           const key = ch + '|' + color;
           if (GLYPH_CACHE[key]) continue;
-
           const cv = document.createElement('canvas');
           cv.width = cv.height = size;
           const g = cv.getContext('2d');
@@ -730,7 +727,7 @@
           g.fillStyle = color;
           g.textAlign = 'center';
           g.textBaseline = 'middle';
-          g.fillText(ch, base / 2, base / 2 + base * 0.04);
+          g.fillText(ch, base/2, base/2 + base*0.04);
           GLYPH_CACHE[key] = cv;
         }
       }
@@ -744,68 +741,53 @@
     window.addEventListener('pointermove', (e) => {
       mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
     }, { passive: true });
-
     window.addEventListener('pointerleave', () => {
       mouse.active = false; mouse.x = undefined; mouse.y = undefined;
     }, { passive: true });
-
     window.addEventListener('pointerdown', (e) => {
       mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
     }, { passive: true });
 
-    if (!window.PointerEvent) {
-      window.addEventListener('touchmove', (e) => {
-        const t = e.touches[0];
-        if (t) { mouse.x = t.clientX; mouse.y = t.clientY; mouse.active = true; }
-      }, { passive: true });
-      window.addEventListener('touchend', () => {
-        mouse.active = false;
-      }, { passive: true });
-    }
-
     class Particle {
-      constructor() { this.reset(); }
-      reset() {
+      constructor(){ this.reset(); }
+      reset(){
         this.x = Math.random() * swW;
         this.y = Math.random() * swH;
         this.baseX = this.x;
         this.baseY = this.y;
-        this.char  = SW_CHARS[(Math.random() * SW_CHARS.length) | 0];
-        this.color = SW_COLORES[(Math.random() * SW_COLORES.length) | 0];
+        this.char  = SW_CHARS[(Math.random()*SW_CHARS.length)|0];
+        this.color = SW_COLORES[(Math.random()*SW_COLORES.length)|0];
         this.size  = Math.random() * 15 + 5;
         this.density = Math.random() * 30 + 1;
         this.glyph = GLYPH_CACHE[this.char + '|' + this.color];
       }
-      draw() {
+      draw(){
         const s = this.size;
-        swCtx.drawImage(this.glyph, this.x - s * 0.5, this.y - s * 0.5, s, s);
+        swCtx.drawImage(this.glyph, this.x - s*0.5, this.y - s*0.5, s, s);
       }
-      update() {
-        if (mouse.active) {
+      update(){
+        if (mouse.active){
           const dx = mouse.x - this.x;
           const dy = mouse.y - this.y;
-          const d2 = dx * dx + dy * dy;
-
-          if (d2 < SW_RADIO_SQ) {
+          const d2 = dx*dx + dy*dy;
+          if (d2 < SW_RADIO_SQ){
             const distance = Math.sqrt(d2) || 0.0001;
             const force = (SW_RADIO - distance) / SW_RADIO;
-            const fdx = dx / distance;
-            const fdy = dy / distance;
-            this.x -= fdx * force * this.density * SW_EMPUJE * 2.2;
-            this.y -= fdy * force * this.density * SW_EMPUJE * 2.2;
+            this.x -= (dx/distance) * force * this.density * SW_EMPUJE * 2.2;
+            this.y -= (dy/distance) * force * this.density * SW_EMPUJE * 2.2;
             return;
           }
         }
         const rx = this.x - this.baseX;
         const ry = this.y - this.baseY;
-        if (rx !== 0 || ry !== 0) {
+        if (rx !== 0 || ry !== 0){
           this.x -= rx / SW_RETORNO;
           this.y -= ry / SW_RETORNO;
         }
       }
     }
 
-    function initSwarm() {
+    function initSwarm(){
       particles = new Array(SW_COUNT);
       for (let i = 0; i < SW_COUNT; i++) particles[i] = new Particle();
     }
@@ -813,44 +795,36 @@
     const SW_FRAME_INTERVAL = 1000 / CONFIG.fps;
     let lastSwTime = 0;
 
-    function animateSwarm(now) {
+    function animateSwarm(now){
       requestAnimationFrame(animateSwarm);
       if (!tabVisible) return;
-
-      const delta = now - lastSwTime;
-      if (delta < SW_FRAME_INTERVAL - 2) return;
+      if (now - lastSwTime < SW_FRAME_INTERVAL - 2) return;
       lastSwTime = now;
 
       swCtx.clearRect(0, 0, swW, swH);
-
       const n = particles.length;
       for (let i = 0; i < n; i++) particles[i].update();
       for (let i = 0; i < n; i++) particles[i].draw();
     }
 
-    function resizeSwarm() {
+    function resizeSwarm(){
       const dpr = getDpr();
-      swW = window.innerWidth;
-      swH = window.innerHeight;
+      swW = window.innerWidth; swH = window.innerHeight;
       swarmCanvasEl.width  = Math.max(1, Math.floor(swW * dpr));
       swarmCanvasEl.height = Math.max(1, Math.floor(swH * dpr));
       swCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       initSwarm();
     }
 
-    /* ============================================================
-       3. TRANSICIÓN SUPERNOVA → SWARM
-    ============================================================ */
-    function runTransition() {
+    /* ---------------- TRANSICIONES ---------------- */
+    function runTransition(){
       playTransition();
-
       transitionOverlay.classList.add('flash');
 
       setTimeout(() => {
         supernovaCanvasEl.style.opacity  = '0';
         supernovaCanvasEl.style.filter   = 'blur(6px)';
         supernovaCanvasEl.style.transform = 'scale(1.04)';
-
         swarmCanvasEl.classList.add('visible');
       }, 450);
 
@@ -859,40 +833,27 @@
         transitionOverlay.classList.add('dissolve');
       }, 800);
 
-      setTimeout(() => {
-        transitionOverlay.classList.remove('dissolve');
-      }, 2100);
-
+      setTimeout(() => { transitionOverlay.classList.remove('dissolve'); }, 2100);
       setTimeout(() => {
         mainBtn.style.opacity = '1';
         mainBtn.style.pointerEvents = 'auto';
       }, 1400);
-
-      setTimeout(() => {
-        supernovaCanvasEl.style.display = 'none';
-      }, 1500);
+      setTimeout(() => { supernovaCanvasEl.style.display = 'none'; }, 1500);
     }
 
     supernova.onEnd = runTransition;
 
-    /* ============================================================
-       4. TRANSICIÓN SWARM → APP
-    ============================================================ */
     let appEntered = false;
-
     mainBtn.addEventListener('click', () => {
       if (appEntered) return;
       appEntered = true;
-
       playTransition();
 
       mainBtn.classList.add('pulse');
       mainBtn.style.pointerEvents = 'none';
 
       transitionOverlay.classList.add('app-enter');
-      requestAnimationFrame(() => {
-        transitionOverlay.classList.add('flash');
-      });
+      requestAnimationFrame(() => { transitionOverlay.classList.add('flash'); });
 
       setTimeout(() => {
         swarmCanvasEl.style.opacity   = '0';
@@ -905,9 +866,7 @@
       setTimeout(() => {
         appScreen.style.display = 'block';
         void appScreen.offsetHeight;
-        requestAnimationFrame(() => {
-          appScreen.classList.add('visible');
-        });
+        requestAnimationFrame(() => { appScreen.classList.add('visible'); });
       }, 750);
 
       setTimeout(() => {
@@ -922,9 +881,7 @@
       }, 2400);
     });
 
-    /* ============================================================
-       5. RESIZE DEBOUNCED
-    ============================================================ */
+    /* ---------------- RESIZE ---------------- */
     let resizeTimer = 0;
     function handleResize(){
       clearTimeout(resizeTimer);
@@ -937,15 +894,11 @@
     window.addEventListener('resize', handleResize, { passive: true });
     window.addEventListener('orientationchange', handleResize, { passive: true });
 
-    /* ============================================================
-       6. ARRANQUE
-    ============================================================ */
+    /* ---------------- ARRANQUE ---------------- */
     resizeSupernova();
     resizeSwarm();
-
     initSupernova();
     initSwarm();
-
     requestAnimationFrame(renderSupernova);
     requestAnimationFrame(animateSwarm);
   })();
@@ -1009,30 +962,23 @@
     async function startCamera(){
       try{
         if(!model){setStatus("Requiere cargar un modelo antes de activar la cámara.","err");return;}
-
         if(webcam) { try{ await webcam.stop(); }catch(e){} webcam = null; }
-
         const flip = (useFacingMode === "user");
         webcam = new tmImage.Webcam(640, 480, flip);
-
         await webcam.setup({ facingMode: useFacingMode });
         await webcam.play();
         running=true;
-
         const container = $("webcam-container");
         container.innerHTML = "";
         container.appendChild(webcam.canvas);
-
         if (flip) webcam.canvas.classList.add("mirror");
         else      webcam.canvas.classList.remove("mirror");
-
         $("placeholder").style.display="none";
         $("scanline").style.display="block";
         $("topPrediction").style.display="flex";
         $("cameraBtn").disabled=true;
         $("stopBtn").disabled=false;
         setStatus(`Sensor activo (${useFacingMode === "user" ? "Frontal" : "Posterior"}).`,"ok");
-
         cancelAnimationFrame(rafId);
         rafId = requestAnimationFrame(loop);
       }catch(e){console.error(e);setStatus("Error de acceso a la cámara. Verifique los permisos.","err");}
@@ -1040,19 +986,13 @@
 
     async function switchCamera(){
       useFacingMode = (useFacingMode === "user") ? "environment" : "user";
-      if(running){
-        await startCamera();
-      } else {
-        setStatus(`Cámara alternada a modo ${useFacingMode === "user" ? "Frontal" : "Posterior"}.`,"ok");
-      }
+      if(running){ await startCamera(); }
+      else { setStatus(`Cámara alternada a modo ${useFacingMode === "user" ? "Frontal" : "Posterior"}.`,"ok"); }
     }
 
     async function loop(){
       if(!running) return;
-      try {
-        webcam.update();
-        await predict();
-      } catch(e){}
+      try { webcam.update(); await predict(); } catch(e){}
       rafId = requestAnimationFrame(loop);
     }
 
@@ -1106,7 +1046,6 @@
       if(saved) $("modelUrl").value=saved;
     } catch(e){}
 
-    /* --- Aura Interactiva (throttled con rAF) --- */
     const aura = $("aura");
     let auraX = 0, auraY = 0, auraQueued = false;
     window.addEventListener('pointermove', (e) => {
@@ -1120,9 +1059,7 @@
       }
     }, { passive: true });
 
-    /* ============================================================
-       ESTRELLAS
-    ============================================================ */
+    /* ---------------- ESTRELLAS ---------------- */
     const starsCanvas = $("stars-canvas");
     const starsCtx = starsCanvas.getContext("2d", { alpha: true, desynchronized: true });
 
@@ -1168,17 +1105,13 @@
       if (!tabVisible) return;
       if (now - lastStarsTime < STARS_FRAME_INTERVAL) return;
       lastStarsTime = now;
-
       const w = SW_STARS_W();
       const h = SW_STARS_H();
       starsCtx.clearRect(0, 0, w, h);
       for (let i = 0; i < stars.length; i++) {
         const s = stars[i];
         s.y -= s.speed;
-        if (s.y < 0) {
-          s.y = h;
-          s.x = Math.random() * w;
-        }
+        if (s.y < 0) { s.y = h; s.x = Math.random() * w; }
         starsCtx.beginPath();
         starsCtx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
         starsCtx.fillStyle = `rgba(255,255,255,${s.alpha})`;
