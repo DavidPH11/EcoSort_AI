@@ -293,7 +293,7 @@
     .grid{display:grid;grid-template-columns:1.35fr .85fr;gap:22px}
     .card{background:linear-gradient(180deg,rgba(16,38,32,.75),rgba(11,25,21,.85));border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);backdrop-filter: blur(12px);-webkit-backdrop-filter: blur(12px);}
     .pad{padding:24px}
-    .camera{position:relative;overflow:hidden;min-height:540px;background:#030a08;border-radius:20px;border:1px solid var(--line)}
+    .camera{position:relative;overflow:hidden;min-height:540px;background:#030a08;border-radius:20px;border:1px solid var(--line);backdrop-filter:none;-webkit-backdrop-filter:none}
     .camera canvas{width:100%;height:100%;object-fit:cover;display:block;}
     .camera canvas.mirror { transform: scaleX(-1); }
 
@@ -497,30 +497,36 @@
   ============================================================ -->
   <script>
   (function forceSpinner(){
-    function apply(now){
+    function apply(){
       const spinners = document.querySelectorAll('.spinner');
+      if (!spinners.length) return false;
       for (let i = 0; i < spinners.length; i++) {
         const el = spinners[i];
-        if (!el.dataset.forced) {
-          el.dataset.forced = '1';
-          el.style.setProperty('animation', 'spin 0.85s linear infinite', 'important');
-          el.style.setProperty('animation-duration', '0.85s', 'important');
-          el.style.setProperty('animation-iteration-count', 'infinite', 'important');
-          el.style.setProperty('animation-timing-function', 'linear', 'important');
-          el.style.setProperty('animation-name', 'spin', 'important');
-        }
-        const cs = window.getComputedStyle(el);
-        const t  = cs.transform;
-        if (el._forceRotate) {
-          const deg = ((now || performance.now()) / 850 * 360) % 360;
-          el.style.transform = 'rotate(' + deg + 'deg)';
-        } else if (t === 'none' && (now || performance.now()) > 200) {
-          el._forceRotate = true;
-        }
+        el.style.setProperty('animation', 'spin 0.85s linear infinite', 'important');
+        el.style.setProperty('animation-duration', '0.85s', 'important');
+        el.style.setProperty('animation-iteration-count', 'infinite', 'important');
+        el.style.setProperty('animation-timing-function', 'linear', 'important');
+        el.style.setProperty('animation-name', 'spin', 'important');
       }
-      requestAnimationFrame(apply);
+      return true;
     }
-    requestAnimationFrame(apply);
+
+    if (!apply()) document.addEventListener('DOMContentLoaded', apply, { once: true });
+
+    /* Una ÚNICA verificación (antes era getComputedStyle en cada frame) */
+    setTimeout(function(){
+      const el = document.querySelector('.spinner');
+      if (!el) return;
+      const cs = getComputedStyle(el);
+      const ok = cs.animationName === 'spin' && cs.animationDuration !== '0s';
+      if (ok) return;
+
+      /* Fallback sólo si el navegador ignora la animación */
+      (function rotate(now){
+        el.style.transform = 'rotate(' + ((now / 850 * 360) % 360) + 'deg)';
+        requestAnimationFrame(rotate);
+      })(performance.now());
+    }, 700);
   })();
   </script>
 
@@ -640,6 +646,7 @@
     function renderSupernova(now){
       requestAnimationFrame(renderSupernova);
       if (!tabVisible) return;
+      if (supernovaCanvasEl.style.display === 'none') return;
       if (now - lastSnTime < SN_FRAME_INTERVAL) return;
       lastSnTime = now;
 
@@ -788,6 +795,8 @@
     function animateSwarm(now){
       requestAnimationFrame(animateSwarm);
       if (!tabVisible) return;
+      if (swarmCanvasEl.style.display === 'none') return;
+      if (!swarmCanvasEl.classList.contains('visible')) return;
       if (now - lastSwTime < SW_FRAME_INTERVAL - 2) return;
       lastSwTime = now;
 
@@ -949,6 +958,16 @@
       box.appendChild(frag);
     }
 
+    /* ---------- Núcleo de inferencia optimizado ---------- */
+    const INFER_SIZE = 224;                        /* entrada real del modelo */
+    const inferCanvas = document.createElement('canvas');
+    inferCanvas.width = inferCanvas.height = INFER_SIZE;
+    const inferCtx = inferCanvas.getContext('2d');
+
+    const PREDICT_INTERVAL = 90;                   /* ms entre inferencias (~11/s) */
+    let lastPredict = 0;
+    let predicting = false;
+
     async function startCamera(){
       try{
         if(!model){setStatus("Requiere cargar un modelo antes de activar la cámara.","err");return;}
@@ -970,6 +989,8 @@
         $("stopBtn").disabled=false;
         setStatus(`Sensor activo (${useFacingMode === "user" ? "Frontal" : "Posterior"}).`,"ok");
         cancelAnimationFrame(rafId);
+        lastPredict = 0;
+        predicting  = false;
         rafId = requestAnimationFrame(loop);
       }catch(e){console.error(e);setStatus("Error de acceso a la cámara. Verifique los permisos.","err");}
     }
@@ -980,27 +1001,48 @@
       else { setStatus(`Cámara alternada a modo ${useFacingMode === "user" ? "Frontal" : "Posterior"}.`,"ok"); }
     }
 
-    async function loop(){
+    /* Vídeo fluido + inferencia desacoplada: nunca bloquea el dibujo del vídeo */
+    function loop(now){
       if(!running) return;
-      try { webcam.update(); await predict(); } catch(e){}
       rafId = requestAnimationFrame(loop);
+
+      /* 1) Vídeo fluido a ritmo de pantalla */
+      try { webcam.update(); } catch(e){ return; }
+
+      /* 2) Inferencia desacoplada */
+      if (predicting || (now - lastPredict) < PREDICT_INTERVAL) return;
+      lastPredict = now;
+      predicting = true;
+      predict()
+        .catch(function(){})
+        .then(function(){ predicting = false; });
     }
 
     async function predict(){
-      const preds=await model.predict(webcam.canvas);
-      frameCount++; $("frames").textContent=frameCount;
-      preds.forEach((p,i)=>{
-        const pct=Math.round(p.probability*100);
-        const label=$("label-"+i); if(label) label.textContent=p.className;
-        const fill=$("fill-"+i); if(fill) fill.style.width=pct+"%";
-        const pctEl=$("pct-"+i); if(pctEl) pctEl.textContent=pct+"%";
-      });
-      const winner=preds.reduce((a,b)=>a.probability>b.probability?a:b);
-      const wp=Math.round(winner.probability*100);
-      $("winnerLabel").textContent=winner.className;
-      $("winnerPct").textContent=wp+"%";
-      $("best").textContent=wp+"%";
-      showAdvice(winner.className,wp);
+      if(!model || !webcam || !webcam.canvas) return;
+      if(webcam.canvas.width === 0 || webcam.canvas.height === 0) return;
+
+      /* Se reduce el fotograma ANTES de convertirlo a tensor:
+         224x224 en vez de 640x480 (≈18x menos píxeles que procesar) */
+      inferCtx.drawImage(webcam.canvas, 0, 0, INFER_SIZE, INFER_SIZE);
+
+      const preds = await model.predict(inferCanvas);
+      frameCount++; $("frames").textContent = frameCount;
+
+      for (let i = 0; i < preds.length; i++){
+        const p = preds[i];
+        const pct = Math.round(p.probability * 100);
+        const label = $("label-" + i); if (label) label.textContent = p.className;
+        const fill  = $("fill-"  + i); if (fill)  fill.style.width  = pct + "%";
+        const pctEl = $("pct-"   + i); if (pctEl) pctEl.textContent = pct + "%";
+      }
+
+      const winner = preds.reduce((a, b) => a.probability > b.probability ? a : b);
+      const wp = Math.round(winner.probability * 100);
+      $("winnerLabel").textContent = winner.className;
+      $("winnerPct").textContent   = wp + "%";
+      $("best").textContent        = wp + "%";
+      showAdvice(winner.className, wp);
     }
 
     function showAdvice(name,pct){
@@ -1052,17 +1094,21 @@
     /* ---------------- ESTRELLAS ---------------- */
     const starsCanvas = $("stars-canvas");
     const starsCtx = starsCanvas.getContext("2d", { alpha: true, desynchronized: true });
+    const appScreenEl = document.getElementById('app-screen');
 
     const IS_MOBILE_STARS = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent) || ((navigator.maxTouchPoints||0)>0 && window.innerWidth<900);
     const numStars = IS_MOBILE_STARS ? 100 : 180;
 
     let stars = [];
 
+    /* Se guarda el DPR usado para que las coordenadas coincidan siempre */
+    let starsDpr = 1;
+
     function resizeStarsCanvas(){
-      const dpr = Math.min(window.devicePixelRatio || 1, IS_MOBILE_STARS ? 1.5 : 2);
-      starsCanvas.width  = Math.max(1, Math.floor(window.innerWidth  * dpr));
-      starsCanvas.height = Math.max(1, Math.floor(window.innerHeight * dpr));
-      starsCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      starsDpr = Math.min(window.devicePixelRatio || 1, IS_MOBILE_STARS ? 1.5 : 2);
+      starsCanvas.width  = Math.max(1, Math.floor(window.innerWidth  * starsDpr));
+      starsCanvas.height = Math.max(1, Math.floor(window.innerHeight * starsDpr));
+      starsCtx.setTransform(starsDpr, 0, 0, starsDpr, 0, 0);
     }
     let starsResizeTimer = 0;
     window.addEventListener("resize", () => {
@@ -1071,8 +1117,8 @@
     }, { passive: true });
     resizeStarsCanvas();
 
-    const SW_STARS_W = () => starsCanvas.width  / (window.devicePixelRatio || 1);
-    const SW_STARS_H = () => starsCanvas.height / (window.devicePixelRatio || 1);
+    const SW_STARS_W = () => starsCanvas.width  / starsDpr;
+    const SW_STARS_H = () => starsCanvas.height / starsDpr;
 
     for(let i = 0; i < numStars; i++){
       stars.push({
@@ -1093,6 +1139,7 @@
     function animateStars(now){
       requestAnimationFrame(animateStars);
       if (!tabVisible) return;
+      if (!appScreenEl.classList.contains('visible')) return;
       if (now - lastStarsTime < STARS_FRAME_INTERVAL) return;
       lastStarsTime = now;
       const w = SW_STARS_W();
